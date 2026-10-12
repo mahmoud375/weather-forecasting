@@ -1,0 +1,8 @@
+requests>=2.31
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+seaborn>=0.12
+statsmodels>=0.14
+scipy>=1.11
+nbformat>=5.9
