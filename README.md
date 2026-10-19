@@ -129,6 +129,81 @@ The pipeline generates 9 publication-grade figures under `artifacts/figures/`:
 - **Data Source:** ECMWF ERA5 Reanalysis
 - **License:** CC BY 4.0
 
+## 🔮 Task 5 — Forecasting
+
+This phase builds time-series preprocessing pipelines, statistical baselines, SARIMAX models, and deep learning architectures (Simple RNN & Stacked LSTM) for multi-step and one-step ahead temperature forecasting.
+
+- **Main Deliverable Notebook:** [`notebooks/task5_forecasting.ipynb`](notebooks/task5_forecasting.ipynb)
+- **Engineered Features Dataset:** [`data/processed/cairo_weather_features.csv`](data/processed/cairo_weather_features.csv)
+- **Task 5 Generated Figures:** [`artifacts/task5/figures/`](artifacts/task5/figures/)
+  - [`outliers_rolling.png`](artifacts/task5/figures/outliers_rolling.png) — Trailing 30-day rolling Z-score detection & winsorization
+  - [`acf_after_differencing.png`](artifacts/task5/figures/acf_after_differencing.png) — ACF curves across differencing transformations
+  - [`acf_pacf.png`](artifacts/task5/figures/acf_pacf.png) — ACF/PACF on first difference for order identification
+  - [`sarima_forecast.png`](artifacts/task5/figures/sarima_forecast.png) — 21-day SARIMA forecast with 95% confidence intervals vs actual
+  - [`residuals_over_time.png`](artifacts/task5/figures/residuals_over_time.png) & [`residual_hist_qq.png`](artifacts/task5/figures/residual_hist_qq.png) — Standardized residual diagnostics
+  - [`error_by_horizon.png`](artifacts/task5/figures/error_by_horizon.png) — Walk-forward error growth across forecast horizons $h = 1 \dots 21$
+  - [`lstm_loss.png`](artifacts/task5/figures/lstm_loss.png) — Training and validation loss curves with EarlyStopping
+  - [`model_comparison.png`](artifacts/task5/figures/model_comparison.png) — MAE and RMSE performance comparison across all models
+
+### Model Comparison Results (Held-Out 21-Day Test Set: Dec 11–31, 2025)
+
+#### Protocol A (21-Step Recursive Out-of-Sample Horizon)
+| Model | MAE (°C) | RMSE (°C) | MAPE (%) | sMAPE (%) | Notes |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **ARIMA (non-seasonal)** | 1.243 | 1.424 | 7.65 | 7.29 | Order (1, 1, 3) |
+| **SARIMA ($m=7$)** | 1.243 | 1.424 | 7.65 | 7.29 | Equals ARIMA(1, 1, 3); `auto_arima` selected $(0, 0, 0)_7$ |
+| **SARIMA manual ($1,1,1)(1,0,1,7)$** | **0.655** | **0.838** | **3.97** | **3.92** | Manual reasoned order with weekly $m=7$ |
+| **Simple RNN (bonus, seed 42)** | 1.220 | 1.461 | 7.30 | 7.68 | Recursive 21-step rollout (seed 42 baseline) |
+| **LSTM (bonus, seed 42)** | 0.771 | 0.954 | 4.75 | 4.59 | Recursive 21-step rollout (seed 42 baseline) |
+| **Persistence** | **0.657** | **0.841** | **3.98** | **3.93** | Repeats last train observation ($16.20^\circ\text{C}$) |
+| **Seasonal-naive (lag 7)** | 1.810 | 2.492 | 10.92 | 10.03 | Cyclic repetition of last 7 train days |
+
+#### Protocol B (One-Step-Ahead Daily Update)
+| Model | MAE (°C) | RMSE (°C) | MAPE (%) | sMAPE (%) | Notes |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **ARIMA (non-seasonal)** | 0.670 | 0.809 | 4.03 | 3.97 | Daily one-step update; order (1, 1, 3) |
+| **SARIMA ($m=7$)** | 0.670 | 0.809 | 4.03 | 3.97 | Equals ARIMA(1, 1, 3); `auto_arima` selected $(0, 0, 0)_7$ |
+| **SARIMA manual ($1,1,1)(1,0,1,7)$** | 0.711 | 0.846 | 4.26 | 4.23 | Manual reasoned order with weekly $m=7$ |
+| **Simple RNN (bonus, seed 42)** | 0.663 | 0.816 | 3.95 | 3.96 | Daily one-step update (seed 42 baseline) |
+| **LSTM (bonus, seed 42)** | **0.594** | **0.747** | **3.58** | **3.55** | Best overall 1-step predictor (seed 42 baseline) |
+| **Persistence** | 0.686 | 0.819 | 4.12 | 4.09 | Previous day's actual observation |
+| **Seasonal-naive (lag 7)** | 1.357 | 1.695 | 8.08 | 7.87 | True value at $t-7$ |
+
+#### 5-Seed Robustness Evaluation (Bonus Deep Learning Models, Seeds 0–4)
+| Model | Protocol A Mean MAE (°C) | Protocol A Mean RMSE (°C) | Protocol B Mean MAE (°C) | Protocol B Mean RMSE (°C) | Protocol B Mean MAPE (%) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Simple RNN (bonus)** | 1.667 ± 0.616 | 1.945 ± 0.671 | 0.696 ± 0.044 | 0.839 ± 0.039 | 4.15 ± 0.26% |
+| **Stacked LSTM (bonus)** | 0.719 ± 0.174 | 0.894 ± 0.173 | **0.587 ± 0.012** | **0.737 ± 0.010** | **3.54 ± 0.08%** |
+
+#### 5-Fold Walk-Forward Validation (`TimeSeriesSplit`, test_size=21)
+> **Note on Coverage:** The 5 walk-forward windows cover only **2025-09-18 to 2025-12-31** (autumn cooling into winter). No window covers spring or summer.
+
+| Model | Mean MAE (°C) | Mean RMSE (°C) | Mean MAPE (%) |
+| :--- | :---: | :---: | :---: |
+| **ARIMA** | 2.068 ± 0.594 | 2.393 ± 0.688 | 9.83% |
+| **SARIMA (auto, $m=7$)** | 2.068 ± 0.594 | 2.393 ± 0.688 | 9.83% |
+| **SARIMA manual ($1,1,1)(1,0,1,7)$** | 1.794 ± 0.827 | 2.112 ± 0.919 | 8.48% |
+| **Persistence** | **1.754 ± 0.776** | **2.077 ± 0.870** | **8.28%** |
+| **Seasonal-naive** | 2.255 ± 0.339 | 2.744 ± 0.354 | 10.61% |
+
+### Conclusion & Empirical Findings
+
+1. **Persistence vs. SARIMA Models:**
+   - Under **Protocol A (21-step recursive rollout)**, the auto-selected **SARIMA ($m=7$, which equals ARIMA(1,1,3)) is worse than persistence** (MAE **1.243°C** vs. **0.657°C**; RMSE **1.424°C** vs. **0.841°C**). While the **manual SARIMA (1,1,1)(1,0,1,7)** achieved **0.655°C** MAE vs. **0.657°C** for Persistence, it has worse training AIC (**3779.63** vs. **3689.18**) than the auto-selected model, is reported as an additional row only, and its tie with persistence in Protocol A should not be over-interpreted (in walk-forward it trails persistence: **1.794°C** vs. **1.754°C** MAE).
+   - In **5-fold walk-forward validation** (`TimeSeriesSplit`, test_size=21), auto-selected SARIMA (= ARIMA) achieves **2.068 ± 0.594°C** Mean MAE, while manual SARIMA achieves **1.794 ± 0.827°C** Mean MAE and Persistence achieves **1.754 ± 0.776°C** Mean MAE. Thus, auto-selected SARIMA is worse than persistence in both Protocol A and walk-forward, whereas manual SARIMA trails persistence across rolling origins.
+
+2. **Multi-Step Forecast Dynamics & Seasonality Hypothesis:**
+   - Because all differenced models use $d=1$, their multi-step forecasts do not mean-revert to an unconditional global mean; instead, they stay close to the last observed level with a small autoregressive transient/drift. When the test series remains relatively flat, this flat projection is why persistence is inherently difficult to beat.
+   - The inability of auto-selected SARIMA to outperform persistence is hypothesized to stem from **missing annual seasonality ($m=365$ days)**: `auto_arima` correctly rejected weekly periodicity ($m=7$) because atmospheric thermodynamics in Cairo exhibits no 7-day physical cycle. Modeling the true annual cycle ($m=365$) is computationally intractable in standard SARIMAX, presenting a likely explanation / hypothesis for why autoregressive models lack the seasonal guidance needed to improve upon simple persistence.
+
+3. **Deep Learning Seed Robustness & Protocol Evaluation:**
+   - Under **Protocol A (21-step recursive rollout)**, LSTM's advantage over SARIMA is not established across random seeds, and it does not beat persistence: across 5 seeds (0–4), Stacked LSTM averages **0.719 ± 0.174°C** MAE (ranging from 0.550°C to 1.032°C) versus **0.657°C** for Persistence, while Simple RNN averages **1.667 ± 0.616°C** MAE (ranging from 0.580°C to 2.458°C). Autonomous multi-step rollouts compound neural error drift significantly.
+   - Under **Protocol B (daily one-step update)**, Stacked LSTM achieves the lowest MAE in the comparison table at **0.587 ± 0.012°C** across 5 seeds (versus **0.686°C** for Persistence and **0.670°C** for ARIMA/SARIMA). However, this seed standard deviation ($\pm 0.012^\circ\text{C}$) reflects neural training randomness only; the test set is a single 21-day December window, and the $\sim 0.1^\circ\text{C}$ performance gap was not tested for statistical significance.
+
+4. **Test Set Scope & Climatological Context:**
+   - The held-out test window is a low-variance December stretch ($N=21$, spanning 2025-12-11 to 2025-12-31) where actual daily mean temperatures range tightly between **15.30°C and 18.80°C (std: 0.83°C)**, compared to **15.70°C to 30.70°C (std: 3.49°C)** across the final 90 days of the training set.
+   - The 5 walk-forward windows cover only **2025-09-18 to 2025-12-31** (autumn cooling into winter), so the walk-forward is also limited to a single season; the larger errors there, e.g. persistence 1.754 vs 0.657 in Dec, match the cooling trend (drop of 13.60°C from 29.50°C to 15.90°C, fold means 27.63°C down to 16.66°C). A key limitation of this evaluation is that no window covers spring or summer.
+
 ## 📜 Attribution
 
 Weather data provided by [Open-Meteo](https://open-meteo.com/) under the Creative Commons Attribution 4.0 International (CC BY 4.0) license.
