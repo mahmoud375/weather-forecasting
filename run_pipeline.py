@@ -36,19 +36,44 @@ logger = logging.getLogger("pipeline")
 # ──────────────────────────────────────────────────────────────────────
 # Imports (after logging setup)
 # ──────────────────────────────────────────────────────────────────────
+import argparse
 import config
 from src import data_acquisition, data_preparation, eda
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Weather Forecasting Foundation Pipeline (Cairo, Egypt)"
+    )
+    parser.add_argument(
+        "--use-cached",
+        action="store_true",
+        default=config.USE_CACHED,
+        help="Reuse cached raw JSON and cleaned CSV if present (skips network API call and prevents file overwrite).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Force fresh network acquisition and full data regeneration even if WEATHER_USE_CACHED=true.",
+    )
+    return parser.parse_args()
+
+
 def main():
     """Execute the full pipeline sequentially."""
+    args = parse_args()
+    use_cached = False if args.force else args.use_cached
+
     pipeline_start = time.time()
 
+    mode_label = "CACHED REPRODUCIBILITY (offline)" if use_cached else "FRESH REGENERATION (Open-Meteo API)"
     logger.info("╔" + "═" * 63 + "╗")
     logger.info("║  WEATHER FORECASTING — FOUNDATION PIPELINE                    ║")
     logger.info("║  Location : Cairo, Egypt (30.04°N, 31.24°E)                   ║")
     logger.info("║  Period   : 2023-01-01 → 2025-12-31 (3 years, daily)          ║")
     logger.info("║  API      : Open-Meteo Historical Weather Archive             ║")
+    logger.info(f"║  Mode     : {mode_label:<50}║")
     logger.info("╚" + "═" * 63 + "╝")
     logger.info("")
 
@@ -57,12 +82,12 @@ def main():
 
     # ── Part 1: Data Acquisition ──────────────────────────────────────
     t1 = time.time()
-    raw_data = data_acquisition.run()
+    raw_data = data_acquisition.run(use_cached=use_cached)
     logger.info(f"  ⏱  Part 1 completed in {time.time() - t1:.2f}s\n")
 
     # ── Part 2: Data Preparation ──────────────────────────────────────
     t2 = time.time()
-    df = data_preparation.run(raw_data)
+    df = data_preparation.run(raw_data, use_cached=use_cached)
     logger.info(f"  ⏱  Part 2 completed in {time.time() - t2:.2f}s\n")
 
     # ── Part 3: Deep EDA ──────────────────────────────────────────────

@@ -55,9 +55,15 @@ def build_request_params() -> Dict[str, Any]:
     return params
 
 
-def fetch_weather_data() -> Dict[str, Any]:
+def fetch_weather_data(use_cached: bool = None) -> Dict[str, Any]:
     """
     Send GET request to Open-Meteo and return the parsed JSON response.
+
+    Parameters
+    ----------
+    use_cached : bool, optional
+        If True and the raw JSON file exists, load from disk instead of
+        making an API call. Defaults to config.USE_CACHED (False by default).
 
     Raises
     ------
@@ -66,8 +72,20 @@ def fetch_weather_data() -> Dict[str, Any]:
     ValueError
         If the response JSON is missing the expected ``daily`` key.
     """
-    params = build_request_params()
+    if use_cached is None:
+        use_cached = config.USE_CACHED
 
+    # Reusing cached raw JSON only when explicitly opted in
+    if use_cached and os.path.exists(config.RAW_JSON_PATH):
+        logger.info(
+            f"Reusing cached raw JSON from {config.RAW_JSON_PATH} "
+            "(opted in via --use-cached / WEATHER_USE_CACHED)"
+        )
+        with open(config.RAW_JSON_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    params = build_request_params()
+    start_time = time.time()
     logger.info(f"Sending request to {config.API_BASE_URL} ...")
     try:
         response = requests.get(config.API_BASE_URL, params=params, timeout=60)
@@ -76,15 +94,7 @@ def fetch_weather_data() -> Dict[str, Any]:
         response.raise_for_status()
         data = response.json()
     except Exception as exc:
-        if os.path.exists(config.RAW_JSON_PATH):
-            logger.warning(
-                f"API request encountered an issue ({exc}). "
-                f"Falling back to existing cached raw dataset at {config.RAW_JSON_PATH}."
-            )
-            with open(config.RAW_JSON_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        else:
-            raise
+        raise
 
     # Validate response structure
     if "daily" not in data:
@@ -100,7 +110,7 @@ def fetch_weather_data() -> Dict[str, Any]:
     return data
 
 
-def save_raw_json(data: Dict[str, Any]) -> str:
+def save_raw_json(data: Dict[str, Any], use_cached: bool = None) -> str:
     """
     Persist the raw API response to disk as indented JSON.
 
@@ -108,14 +118,27 @@ def save_raw_json(data: Dict[str, Any]) -> str:
     ----------
     data : dict
         The full API response dictionary.
+    use_cached : bool, optional
+        If True and file exists, preserves the existing file. Defaults to config.USE_CACHED.
 
     Returns
     -------
     str
         Absolute path to the saved file.
     """
+    if use_cached is None:
+        use_cached = config.USE_CACHED
+
     config.ensure_dirs()
     path = config.RAW_JSON_PATH
+
+    if use_cached and os.path.exists(path):
+        size_kb = os.path.getsize(path) / 1024
+        logger.info(
+            f"Preserving existing raw JSON at {path} ({size_kb:.1f} KB) "
+            "(opted in via --use-cached / WEATHER_USE_CACHED)"
+        )
+        return path
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -125,27 +148,35 @@ def save_raw_json(data: Dict[str, Any]) -> str:
     return path
 
 
-def run() -> Dict[str, Any]:
+def run(use_cached: bool = None) -> Dict[str, Any]:
     """
     Execute the full data-acquisition pipeline.
+
+    Parameters
+    ----------
+    use_cached : bool, optional
+        If True, reuse existing cached raw JSON. Defaults to config.USE_CACHED (False).
 
     Steps
     -----
     1. Build API request parameters.
-    2. Fetch data from Open-Meteo.
-    3. Save raw JSON to ``data/raw/``.
+    2. Fetch data from Open-Meteo (or load cache if opted in).
+    3. Save raw JSON to ``data/raw/`` (or preserve if cached).
 
     Returns
     -------
     dict
         The raw API response dictionary (for downstream use).
     """
+    if use_cached is None:
+        use_cached = config.USE_CACHED
+
     logger.info("=" * 65)
     logger.info("PART 1 — DATA ACQUISITION")
     logger.info("=" * 65)
 
-    data = fetch_weather_data()
-    save_raw_json(data)
+    data = fetch_weather_data(use_cached=use_cached)
+    save_raw_json(data, use_cached=use_cached)
 
     logger.info("Part 1 complete.\n")
     return data

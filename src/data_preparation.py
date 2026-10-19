@@ -240,17 +240,35 @@ def verify_units_and_bounds(df: pd.DataFrame) -> None:
 # Export
 # ──────────────────────────────────────────────────────────────────────
 
-def export_clean_csv(df: pd.DataFrame) -> str:
+def export_clean_csv(df: pd.DataFrame, use_cached: bool = None) -> str:
     """
     Save the validated, cleaned DataFrame to CSV.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned time-series dataframe.
+    use_cached : bool, optional
+        If True and file exists, preserves the existing file. Defaults to config.USE_CACHED.
 
     Returns
     -------
     str
         Path to the exported CSV.
     """
+    if use_cached is None:
+        use_cached = config.USE_CACHED
+
     config.ensure_dirs()
     path = config.CLEAN_CSV_PATH
+
+    if use_cached and os.path.exists(path):
+        size_kb = os.path.getsize(path) / 1024
+        logger.info(
+            f"Preserving existing clean CSV at {path} ({size_kb:.1f} KB, {len(df)} rows) "
+            "(opted in via --use-cached / WEATHER_USE_CACHED)"
+        )
+        return path
 
     df.to_csv(path, float_format="%.2f")
     size_kb = os.path.getsize(path) / 1024
@@ -283,7 +301,7 @@ def load_clean_data() -> pd.DataFrame:
 # Pipeline entry point
 # ──────────────────────────────────────────────────────────────────────
 
-def run(raw_data: dict = None) -> pd.DataFrame:
+def run(raw_data: dict = None, use_cached: bool = None) -> pd.DataFrame:
     """
     Execute the full data-preparation pipeline.
 
@@ -291,12 +309,18 @@ def run(raw_data: dict = None) -> pd.DataFrame:
     ----------
     raw_data : dict, optional
         Pre-loaded API response dict.  If None, loads from disk.
+    use_cached : bool, optional
+        If True, reuse existing cleaned CSV if present and raw_data is None.
+        Defaults to config.USE_CACHED (False).
 
     Returns
     -------
     pd.DataFrame
         The cleaned, validated DataFrame.
     """
+    if use_cached is None:
+        use_cached = config.USE_CACHED
+
     logger.info("=" * 65)
     logger.info("PART 2 — DATA PREPARATION")
     logger.info("=" * 65)
@@ -320,7 +344,7 @@ def run(raw_data: dict = None) -> pd.DataFrame:
     verify_units_and_bounds(df)
 
     # 6. Export
-    export_clean_csv(df)
+    export_clean_csv(df, use_cached=use_cached)
 
     logger.info("Part 2 complete.\n")
     return df

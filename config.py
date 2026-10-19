@@ -85,6 +85,10 @@ RAW_JSON_PATH = os.path.join(RAW_DATA_DIR, "open_meteo_response.json")
 CLEAN_CSV_PATH = os.path.join(PROCESSED_DATA_DIR, "cairo_weather_clean.csv")
 EXECUTIVE_SUMMARY_PATH = os.path.join(ARTIFACTS_DIR, "executive_summary.md")
 
+# Flag to control whether existing raw data / clean dataset should be reused
+# Default is False (always regenerate); opt in via WEATHER_USE_CACHED=true or --use-cached CLI flag
+USE_CACHED = os.getenv("WEATHER_USE_CACHED", "false").lower() in ("true", "1", "yes")
+
 # ──────────────────────────────────────────────────────────────────────
 # 4. EDA parameters
 # ──────────────────────────────────────────────────────────────────────
