@@ -11,3 +11,6 @@ pmdarima>=2.0
 tensorflow>=2.15
 nbclient>=0.8
 ipykernel>=6.25
+django>=5.0
+whitenoise>=6.6
+joblib>=1.3

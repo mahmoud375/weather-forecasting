@@ -6,6 +6,7 @@
 > - **Visual EDA Gallery:** [`artifacts/figures/`](artifacts/figures/) — 9 publication-grade visualizations (150 DPI) spanning time-series dynamics, rolling windows, classical additive decomposition (statsmodels seasonal_decompose, period=365), ACF/PACF, correlation, and rolling Z-score anomaly detection.
 > - **Preprocessed Time-Series Dataset:** [`data/processed/cairo_weather_clean.csv`](data/processed/cairo_weather_clean.csv) — 1,096 continuous daily observations (2023–2025) across 7 cleaned, unscaled variables in physical units (zero missing values, validated bounds).
 > - **Interactive Evaluation Notebook:** [`notebooks/main_pipeline.ipynb`](notebooks/main_pipeline.ipynb) — Executable Jupyter notebook providing step-by-step walkthrough of Parts 1, 2, and 3 with inline plots and analysis.
+> - **Production Django Deployment (Task 6):** [Task 6 Section](#-task-6-deploying-the-weather-prediction-model-with-django) — Production-grade web interface and REST API (`/api/predict/`) with Bootstrap 5 UI, thread-safe ML singleton loader, Chart.js trends, and in-memory LRU caching.
 
 ---
 
@@ -204,6 +205,131 @@ This phase builds time-series preprocessing pipelines, statistical baselines, SA
    - The held-out test window is a low-variance December stretch ($N=21$, spanning 2025-12-11 to 2025-12-31) where actual daily mean temperatures range tightly between **15.30°C and 18.80°C (std: 0.83°C)**, compared to **15.70°C to 30.70°C (std: 3.49°C)** across the final 90 days of the training set.
    - The 5 walk-forward windows cover only **2025-09-18 to 2025-12-31** (autumn cooling into winter), so the walk-forward is also limited to a single season; the larger errors there, e.g. persistence 1.754 vs 0.657 in Dec, match the cooling trend (drop of 13.60°C from 29.50°C to 15.90°C, fold means 27.63°C down to 16.66°C). A key limitation of this evaluation is that no window covers spring or summer.
 
+---
+
+## 🚀 Task 6: Deploying the Weather Prediction Model with Django
+
+Transforms our trained weather forecasting pipeline into a production-grade, responsive, and visually modern web application and REST API.
+
+### 📸 Interface Gallery
+
+| Form Input & Scenario Presets | Inference Result & Realtime Gauge |
+|:---:|:---:|
+| ![Form Input State](artifacts/screenshots/form_input_state.png) | ![Prediction Result State](artifacts/screenshots/prediction_result_state.png) |
+
+| Dynamic Weather Condition Adaptation | Responsive Mobile Experience |
+|:---:|:---:|
+| ![Rainy Scenario State](artifacts/screenshots/rainy_scenario_state.png) | ![Mobile Viewport State](artifacts/screenshots/mobile_viewport_state.png) |
+
+### 🏗️ Architecture & Separation of Concerns
+
+1. **One-Time Singleton ML Service (`forecast/services/ml_service.py`):**
+   - Implements thread-safe `WeatherModelService.get_instance()`.
+   - Initialized **ONCE** during Django startup via `AppConfig.ready()` in `forecast/apps.py`. Models reside resident in memory and are never re-read from disk on incoming HTTP requests.
+   - Computes empirical 95% prediction intervals ($\pm 1.96 \cdot \sigma_{\text{resid}}$) and contextual weather condition classifications with dynamic color-coded iconography.
+
+2. **Strict Physical Boundary Validation (`forecast/forms.py`):**
+   - Validates all meteorological fields with unit badges (`°C`, `%`, `km/h`, `mm`).
+   - Enforces domain boundaries: Cairo temperatures (-5°C to 55°C), humidity (0% to 100%), non-negative wind speed and precipitation.
+   - Enforces cross-field consistency (`temp_max_c >= temp_min_c`) and renders inline Bootstrap 5 `.invalid-feedback` error states without clearing valid user entries.
+
+3. **Bonus Challenges Implemented:**
+   - **JSON REST API Endpoint (`/api/predict/`):** Accepts POST JSON, performs full validation, and returns structured forecast JSON with sub-millisecond latency.
+   - **Model Selection Dropdown:** Toggle between primary non-linear `RandomForestRegressor` ($R^2 = 0.9931$) and alternative linear `Ridge` pipeline ($R^2 = 0.9961$).
+   - **Realtime Chart.js Dashboard Card:** Session-backed dynamic chart showing forecast trends and temperature envelopes across recent runs.
+   - **In-Memory Caching:** `@lru_cache` memoization keyed on `(model_name, *features)` returns identical predictions instantaneously with `"is_cached": true`.
+
+4. **Production Readiness:**
+   - Static asset compression and serving handled directly via **WhiteNoise** (`whitenoise.storage.CompressedStaticFilesStorage`).
+   - Configurable environment flags: `DEBUG`, `ALLOWED_HOSTS`, and `DJANGO_SECRET_KEY`.
+   - Comprehensive automated test suite (`forecast/tests.py`) covering singleton initialization, model precision, form boundaries, HTTP views, and REST API.
+
+### ⚙️ Quickstart & Local Execution
+
+#### 1. Install Dependencies
+```bash
+uv pip install -r requirements.txt --python .venv/bin/python
+```
+
+#### 2. Train and Serialize Models (if not already built)
+```bash
+uv run python src/train_models.py
+```
+
+#### 3. Run Database Migrations & Collect Static Files
+```bash
+uv run python manage.py migrate
+uv run python manage.py collectstatic --noinput
+```
+
+#### 4. Run Automated Tests
+```bash
+uv run python manage.py test forecast
+```
+*(All 17 test suites pass with 100% success rate)*
+
+#### 5. Launch the Development Server
+```bash
+uv run python manage.py runserver 127.0.0.1:8000
+```
+Then open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in your browser.
+
+### 🌐 Programmatic REST API
+
+#### Endpoint
+`POST http://127.0.0.1:8000/api/predict/`
+
+#### Sample cURL Request
+```bash
+curl -X POST http://127.0.0.1:8000/api/predict/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_choice": "rf",
+    "temp_max_c": 30.5,
+    "temp_min_c": 19.0,
+    "humidity_pct": 52.0,
+    "wind_speed_max_kmh": 16.5,
+    "precipitation_mm": 0.0,
+    "cloud_cover_pct": 25.0
+  }'
+```
+
+#### Sample JSON Response (HTTP 200 OK)
+```json
+{
+  "status": "success",
+  "prediction": 24.23,
+  "units": "°C",
+  "model_used": "Random Forest Regressor (Primary)",
+  "model_key": "rf",
+  "prediction_interval": {
+    "lower": 23.37,
+    "upper": 25.08,
+    "margin": 0.86,
+    "confidence": "95%"
+  },
+  "weather_condition": {
+    "condition": "Clear & Sunny",
+    "icon": "bi-brightness-high-fill",
+    "color": "warning",
+    "bg_gradient": "linear-gradient(135deg, #f12711 0%, #f5af19 100%)",
+    "description": "Clear skies across the Cairo basin"
+  },
+  "is_cached": false,
+  "inputs": {
+    "temp_max_c": 30.5,
+    "temp_min_c": 19.0,
+    "humidity_pct": 52.0,
+    "wind_speed_max_kmh": 16.5,
+    "precipitation_mm": 0.0,
+    "cloud_cover_pct": 25.0
+  }
+}
+```
+
+---
+
 ## 📜 Attribution
 
 Weather data provided by [Open-Meteo](https://open-meteo.com/) under the Creative Commons Attribution 4.0 International (CC BY 4.0) license.
+

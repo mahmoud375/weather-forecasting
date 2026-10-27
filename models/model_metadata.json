@@ -1,0 +1,86 @@
+{
+  "target": "temp_mean_c",
+  "target_unit": "\u00b0C",
+  "target_description": "Cairo Daily Mean Temperature",
+  "features": [
+    "temp_max_c",
+    "temp_min_c",
+    "humidity_pct",
+    "wind_speed_max_kmh",
+    "precipitation_mm",
+    "cloud_cover_pct"
+  ],
+  "feature_bounds": {
+    "temp_max_c": {
+      "min": -5.0,
+      "max": 55.0,
+      "unit": "\u00b0C",
+      "label": "Max Temperature"
+    },
+    "temp_min_c": {
+      "min": -5.0,
+      "max": 55.0,
+      "unit": "\u00b0C",
+      "label": "Min Temperature"
+    },
+    "humidity_pct": {
+      "min": 0.0,
+      "max": 100.0,
+      "unit": "%",
+      "label": "Relative Humidity"
+    },
+    "wind_speed_max_kmh": {
+      "min": 0.0,
+      "max": 150.0,
+      "unit": "km/h",
+      "label": "Wind Speed"
+    },
+    "precipitation_mm": {
+      "min": 0.0,
+      "max": 300.0,
+      "unit": "mm",
+      "label": "Precipitation"
+    },
+    "cloud_cover_pct": {
+      "min": 0.0,
+      "max": 100.0,
+      "unit": "%",
+      "label": "Cloud Cover"
+    }
+  },
+  "models": {
+    "rf": {
+      "name": "Random Forest Regressor (Primary)",
+      "file": "weather_model.joblib",
+      "mae": 0.3407,
+      "rmse": 0.4364,
+      "r2": 0.9931,
+      "residual_std": 0.4363,
+      "ci_margin_95": 0.8552
+    },
+    "ridge": {
+      "name": "Ridge Linear Regression (Alternative)",
+      "file": "weather_model_ridge.joblib",
+      "mae": 0.2581,
+      "rmse": 0.3266,
+      "r2": 0.9961,
+      "residual_std": 0.3211,
+      "ci_margin_95": 0.6293
+    }
+  },
+  "dataset": {
+    "samples": 1096,
+    "train_samples": 876,
+    "test_samples": 220,
+    "date_start": "2023-01-01",
+    "date_end": "2025-12-31"
+  },
+  "default_cairo_example": {
+    "temp_max_c": 30.5,
+    "temp_min_c": 19.0,
+    "humidity_pct": 52.0,
+    "wind_speed_max_kmh": 16.5,
+    "precipitation_mm": 0.0,
+    "cloud_cover_pct": 25.0
+  }
+}

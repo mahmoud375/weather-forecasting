@@ -1,0 +1,106 @@
+/* 
+ * style.css — Custom styles for Cairo Weather Forecasting Web App
+ * Tech aesthetic with subtle glassmorphism and crisp typography
+ */
+
+:root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+}
+
+.font-monospace {
+    font-family: var(--font-mono) !important;
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.icon-box-lg {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #198754;
+    display: inline-block;
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.25);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.5);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(25, 135, 84, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+    }
+}
+
+.tracking-tight {
+    letter-spacing: -0.03em;
+}
+
+.tracking-wider {
+    letter-spacing: 0.05em;
+}
+
+.extra-small {
+    font-size: 0.75rem;
+}
+
+.fw-black {
+    font-weight: 800;
+}
+
+.result-card {
+    transition: all 0.3s ease;
+}
+
+.result-card-idle {
+    border: 2px dashed rgba(255, 255, 255, 0.15) !important;
+}
+
+.weather-banner {
+    transition: transform 0.2s ease;
+}
+
+.weather-banner:hover {
+    transform: translateY(-2px);
+}
+
+.preset-btn {
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+    transform: translateY(-1px);
+}
+
+.input-group-text {
+    min-width: 48px;
+    justify-content: center;
+}
+
+/* Card hover glow */
+.card {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12) !important;
+}
