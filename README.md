@@ -1,4 +1,4 @@
-# Weather Forecasting — Foundation Phase (Week 4)
+# Weather Forecasting
 
 > [!IMPORTANT]
 > ### 📌 Primary Deliverables & Key Artifacts
